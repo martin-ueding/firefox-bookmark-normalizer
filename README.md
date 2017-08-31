@@ -40,7 +40,7 @@ Open Firefox and go into the bookmark menu:
 
 Then export the bookmarks as a JSON backup file:
 
-![](doc/1-backup.png)
+![](doc/2-backup.png)
 
 From there you can start the script and create a new JSON file with the
 transformed URLs. After that, import the new JSON file into Firefox using the
