@@ -1,0 +1,4 @@
+uri:
+    https://www.youtube.com/watch\?v=([^&]+)&index=\d+&list=[^&]+: https://www.youtube.com/watch?v=\1
+    https://www.youtube.com/watch\?v=([^&]+)&list=[^&]+: https://www.youtube.com/watch?v=\1
+    https://www.youtube.com/watch\?v=([^&]+)&feature=youtu.be: https://www.youtube.com/watch?v=\1

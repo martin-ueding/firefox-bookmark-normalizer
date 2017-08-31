@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Copyright © 2017 Martin Ueding <dev@martin-ueding.de>
+
+import argparse
+import json
+import os
+import pprint
+import re
+
+import requests
+import yaml
+
+
+class RedirectCache(object):
+    PATH = 'redirect-cache.yml'
+
+    def __init__(self):
+        if os.path.isfile(self.PATH):
+            with open(self.PATH) as f:
+                self.cache = yaml.load(f)
+        else:
+            self.cache = {}
+
+    def __getitem__(self, key):
+        return self.cache[key]
+
+    def __setitem__(self, key, value):
+        self.cache[key] = value
+        with open(self.PATH, 'w') as f:
+            yaml.dump(self.cache, f, indent=2, default_flow_style=False)
+
+    def __contains__(self, key):
+        return key in self.cache
+
+
+redirect_cache = RedirectCache()
+
+
+def get_redirected(url):
+    if not any(url.startswith(scheme) for scheme in ['http://', 'https://']):
+        return url
+
+    if url in redirect_cache:
+        return redirect_cache[url]
+
+    # Short-circuit
+    return url
+
+    print('HEAD', url)
+    try:
+        r = requests.head(url, allow_redirects=True, timeout=10)
+    except requests.exceptions.TooManyRedirects:
+        return url
+    except requests.exceptions.ConnectionError:
+        return url
+    except requests.exceptions.ReadTimeout:
+        return url
+
+    redirect_cache[url] = r.url
+
+    return r.url
+
+
+def transform_url(url, transforms, do_redirects):
+    new_url = get_redirected(url)
+
+    for pattern, replacement in transforms['uri'].items():
+        if re.match(pattern, new_url):
+            old = new_url
+            new_url = re.sub(pattern, replacement, new_url)
+
+            print(old, '==>', new_url)
+
+    return new_url
+
+
+def traverse_tree(tree, *transform_args):
+    if 'children' in tree:
+        for child in tree['children']:
+            traverse_tree(child, *transform_args)
+
+    if 'uri' in tree:
+        tree['uri'] = transform_url(tree['uri'], *transform_args)
+
+
+def main():
+    options = _parse_args()
+
+    with open(options.input) as f:
+        data = json.load(f)
+
+    transformations = dict(uri={})
+    for path in options.transformation:
+        with open(path) as f:
+            tr = yaml.load(f)
+            transformations['uri'].update(tr['uri'])
+
+    pprint.pprint(transformations)
+
+    traverse_tree(data, transformations, True)
+
+    with open(options.output, 'w') as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+
+
+def _parse_args():
+    '''
+    Parses the command line arguments.
+
+    :return: Namespace with arguments.
+    :rtype: Namespace
+    '''
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('input')
+    parser.add_argument('output')
+    parser.add_argument('transformation', nargs='+')
+    options = parser.parse_args()
+
+    return options
+
+
+if __name__ == '__main__':
+    main()
